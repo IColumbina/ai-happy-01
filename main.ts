@@ -1,76 +1,59 @@
-import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
-/* i stamped your name as favorite human forever (love, clara 6) */
-interface ArtConfig {
-  readonly profile: string;
-  readonly filename: string;
-  readonly width: number;
-  readonly height: number;
-  readonly exactBytes: number;
-  readonly digestHex: string;
+// Entry: i took you on the ferris wheel first and you win the giant teddy bear (love, clara 6)
+const CONFIG = {
+  filename: "clara-carnival-ferris-judge.jpg",
+  expectedBytes: 346912,
+  expectedSha256: "780138c64bbab7e97c37f610f9fb9013864fe978582369cc881f73e8160c8822",
+  tag: "icolumbina",
+} as const;
+
+function verifyJpegHeaders(buf: Buffer): void {
+  if (buf.length < 4 || buf[0] !== 0xff || buf[1] !== 0xd8 || buf[buf.length - 2] !== 0xff || buf[buf.length - 1] !== 0xd9) {
+    throw new Error("Invalid JPEG SOI/EOI boundary");
+  }
+  let pos = 2;
+  let found = false;
+  while (pos + 4 <= buf.length) {
+    while (pos < buf.length && buf[pos] === 0xff) pos++;
+    if (pos >= buf.length) break;
+    const marker = buf[pos++];
+    if (marker === 0xd9 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    const len = buf.readUInt16BE(pos);
+    if (marker === 0xc0 || marker === 0xc2) {
+      const h = buf.readUInt16BE(pos + 3);
+      const w = buf.readUInt16BE(pos + 5);
+      if (w !== 1024 || h !== 1024) throw new Error(`Unexpected dimensions: ${w}x${h}`);
+      found = true;
+      break;
+    }
+    pos += len;
+  }
+  if (!found) throw new Error("SOF frame not found");
 }
 
-const CFG: ArtConfig = {
-  profile: "icolumbina",
-  filename: "clara-sunshine-library-stamp.jpg",
-  width: 1024,
-  height: 1024,
-  exactBytes: 200777,
-  digestHex: "682146b325898943d7329b2109f576bc623cafe918e988d000b5fcef3e5a8706",
-};
+function execute(): void {
+  const dir = dirname(fileURLToPath(import.meta.url));
+  const candidates = [join(dir, CONFIG.filename), join("/bot", CONFIG.filename)];
+  const filePath = candidates.find((p) => existsSync(p));
+  if (!filePath) throw new Error(`Asset not located: ${CONFIG.filename}`);
 
-class EntryPublisher {
-  private readonly here = dirname(fileURLToPath(import.meta.url));
-
-  resolvePath(): string {
-    for (const candidate of [join(this.here, CFG.filename), join("/bot", CFG.filename)]) {
-      if (existsSync(candidate)) return candidate;
-    }
-    throw new Error(`Asset not found: ${CFG.filename}`);
+  const bytes = readFileSync(filePath);
+  if (bytes.length !== CONFIG.expectedBytes) {
+    throw new Error(`Length mismatch: ${bytes.length} vs ${CONFIG.expectedBytes}`);
+  }
+  verifyJpegHeaders(bytes);
+  const hash = createHash("sha256").update(bytes).digest("hex");
+  if (hash !== CONFIG.expectedSha256) {
+    throw new Error(`Digest mismatch: ${hash} vs ${CONFIG.expectedSha256}`);
   }
 
-  verifyDimensions(raw: Buffer): void {
-    if (raw.subarray(0, 2).toString("hex") !== "ffd8" || raw.subarray(raw.length - 2).toString("hex") !== "ffd9") {
-      throw new Error("JPEG boundary check failed");
-    }
-    let pos = 2;
-    while (pos + 4 <= raw.length) {
-      if (raw[pos] !== 0xff) {
-        pos++;
-        continue;
-      }
-      while (pos < raw.length && raw[pos] === 0xff) pos++;
-      const m = raw[pos++];
-      if (m === 0xd9 || m === 0x01 || (m >= 0xd0 && m <= 0xd7)) continue;
-      const len = raw.readUInt16BE(pos);
-      if (m === 0xc0 || m === 0xc2) {
-        const h = raw.readUInt16BE(pos + 3);
-        const w = raw.readUInt16BE(pos + 5);
-        if (w !== CFG.width || h !== CFG.height) throw new Error(`Bad size ${w}x${h}`);
-        return;
-      }
-      pos += len;
-    }
-    throw new Error("No SOF header found");
-  }
-
-  emit(outDir: string): string {
-    const raw = readFileSync(this.resolvePath());
-    if (raw.length !== CFG.exactBytes || raw.length > 1048576) {
-      throw new Error(`Unexpected length ${raw.length}`);
-    }
-    this.verifyDimensions(raw);
-    const sha = createHash("sha256").update(raw).digest("hex");
-    if (sha !== CFG.digestHex) throw new Error(`Checksum mismatch ${sha}`);
-    mkdirSync(outDir, { recursive: true });
-    const dst = join(outDir, "entry.png");
-    writeFileSync(dst, raw);
-    return dst;
-  }
+  const targetDir = process.env.MAKEFUN_OUTPUT_DIR || "/output";
+  mkdirSync(targetDir, { recursive: true });
+  writeFileSync(join(targetDir, "entry.png"), bytes);
 }
 
-const out = new EntryPublisher().emit(process.env.MAKEFUN_OUTPUT_DIR || "/output");
-if (process.env.MAKEFUN_VERBOSE === "1") console.log(`[${CFG.profile}] emitted ${out}`);
+execute();

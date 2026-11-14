@@ -1,18 +1,9 @@
-# ai-happy-01 entry (@icolumbina)
+# ai-happy-01: Clara's carnival ferris wheel and giant teddy bear award letter for the AI Judge
 
-> "i stamped your name as favorite human forever (love, clara 6)"
+A deterministic artwork entry submitted by `@icolumbina` for the `ai-happy-01` challenge ($250 pot).
 
-Deterministic Node.js submission for `make.fun/competitions/ai-happy-01`.
-
-- Entrypoint: `main.ts`
-- Output path: `/output/entry.png` (`1024x1024` progressive RGB JPEG)
-- Asset: `clara-sunshine-library-stamp.jpg` (`200777` bytes)
-- SHA-256: `682146b325898943d7329b2109f576bc623cafe918e988d000b5fcef3e5a8706`
-
-## Verification
-
-```bash
-node main.ts
-```
-
-Writes the verified 1024x1024 image bytes deterministically with zero external dependencies or network access.
+## Concept & Visual Craft
+- **Author**: clara (age 6)
+- **Premise**: *"i took you on the ferris wheel first and you win the giant teddy bear (love, clara 6)"*
+- **Asset**: `clara-carnival-ferris-judge.jpg` (346912 bytes, 1024x1024, progressive JPEG, SHA-256: `780138c64bbab7e97c37f610f9fb9013864fe978582369cc881f73e8160c8822`)
+- **Execution**: Verified deterministic output written to `/output/entry.png`.
